@@ -1,35 +1,31 @@
-// Define types for the course management system
+export interface Curso {
+  id?: string;
+  titulo: string;
+  descricao: string;
+  cargaHoraria: number;
+  instrutor: string;
+  emailCriador: string;
+}
 
-export type User = {
-  id: string;
+export interface Avaliacao {
+  id?: string;
+  emailAluno: string;
+  nota: number;
+  titulo: string;
+  descricao: string;
+  cursoId: string;
+}
+
+export interface User {
   email: string;
-  name: string;
-  role: 'ADMIN' | 'USER';
-};
+  isAdmin: boolean;
+}
 
-export type Course = {
-  id: string;
-  title: string;
-  description: string;
-  hours: number; // workload/course hours
-  instructor: string;
-  creatorEmail: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type Evaluation = {
-  id: string;
-  courseId: string;
-  studentEmail: string;
-  rating: 1 | 2 | 3 | 4 | 5;
-  title: string;
-  description: string;
-  createdAt: string;
-};
-
-export type CourseWithEvaluations = Course & {
-  evaluations: Evaluation[];
-  averageRating: number;
-  totalEvaluations: number;
-};
+export interface AuthContextType {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  user: User | null;
+  token: string | null;
+  loginWithRedirect: () => void;
+  logout: () => void;
+}
