@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Loader, Search } from 'lucide-react';
 import CursoCard from '../components/CursoCard';
 import { Curso } from '../types';
@@ -8,13 +8,16 @@ import { useAuth } from '../auth/AuthContext';
 
 const Cursos: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
+
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [filteredCursos, setFilteredCursos] = useState<Curso[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unauthorized, setUnauthorized] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
-  
+
   const isAdmin = user?.isAdmin;
 
   useEffect(() => {
@@ -23,9 +26,14 @@ const Cursos: React.FC = () => {
         const data = await getCursos();
         setCursos(data);
         setFilteredCursos(data);
-      } catch (error) {
-        console.error('Erro ao buscar cursos:', error);
-        setError('Não foi possível carregar os cursos. Tente novamente mais tarde.');
+      } catch (err: any) {
+        if (err.response?.status === 401) {
+          setUnauthorized(true);
+          setError('Você precisa estar logado para ver os cursos.');
+        } else {
+          console.error('Erro ao buscar cursos:', err);
+          setError('Não foi possível carregar os cursos. Tente novamente mais tarde.');
+        }
       } finally {
         setLoading(false);
       }
@@ -38,27 +46,36 @@ const Cursos: React.FC = () => {
     if (searchTerm.trim() === '') {
       setFilteredCursos(cursos);
     } else {
-      const filtered = cursos.filter(curso => 
-        curso.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        curso.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        curso.instrutor.toLowerCase().includes(searchTerm.toLowerCase())
+      const termo = searchTerm.toLowerCase();
+      setFilteredCursos(
+        cursos.filter(c =>
+          c.titulo.toLowerCase().includes(termo) ||
+          c.descricao.toLowerCase().includes(termo) ||
+          c.instrutor.toLowerCase().includes(termo)
+        )
       );
-      setFilteredCursos(filtered);
     }
   }, [searchTerm, cursos]);
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este curso? Esta ação não pode ser desfeita.')) {
-      setDeleting(id);
-      try {
-        await deleteCurso(id);
-        setCursos(prevCursos => prevCursos.filter(curso => curso.id !== id));
-      } catch (error) {
-        console.error('Erro ao excluir curso:', error);
+    if (!window.confirm('Tem certeza que deseja excluir este curso? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    setDeleting(id);
+    try {
+      await deleteCurso(id);
+      setCursos(prev => prev.filter(c => c.id !== id));
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        alert('Você precisa estar logado para excluir cursos.');
+        navigate('/');
+      } else {
+        console.error('Erro ao excluir curso:', err);
         alert('Não foi possível excluir o curso. Verifique se não há matrículas associadas.');
-      } finally {
-        setDeleting(null);
       }
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -74,12 +91,21 @@ const Cursos: React.FC = () => {
     return (
       <div className="text-center py-10">
         <p className="text-red-600 mb-4">{error}</p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors"
-        >
-          Tentar Novamente
-        </button>
+        {unauthorized ? (
+          <button
+            onClick={() => navigate('/')}
+            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+          >
+            Voltar para Home
+          </button>
+        ) : (
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        )}
       </div>
     );
   }
@@ -88,9 +114,9 @@ const Cursos: React.FC = () => {
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <h1 className="text-3xl font-bold mb-4 md:mb-0">Cursos Disponíveis</h1>
-        
+
         {isAuthenticated && isAdmin && (
-          <Link 
+          <Link
             to="/cursos/novo"
             className="inline-flex items-center bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
           >
@@ -99,7 +125,7 @@ const Cursos: React.FC = () => {
           </Link>
         )}
       </div>
-      
+
       {/* Barra de pesquisa */}
       <div className="relative mb-8">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -113,12 +139,12 @@ const Cursos: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      
+
       {filteredCursos.length === 0 ? (
         <div className="text-center py-10 bg-gray-50 rounded-lg">
           <p className="text-gray-600 mb-4">Nenhum curso encontrado.</p>
           {searchTerm && (
-            <button 
+            <button
               onClick={() => setSearchTerm('')}
               className="text-black hover:underline"
             >
@@ -135,8 +161,8 @@ const Cursos: React.FC = () => {
                   <Loader className="h-8 w-8 animate-spin text-gray-700" />
                 </div>
               )}
-              <CursoCard 
-                curso={curso} 
+              <CursoCard
+                curso={curso}
                 onDelete={isAdmin ? handleDelete : undefined}
               />
             </div>
